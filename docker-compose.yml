@@ -1,0 +1,238 @@
+name: "spark-kafka-cluster"
+
+networks:
+  spark-kafka:
+    name: spark-kafka
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: "172.18.0.0/16"
+
+services:
+  spark-master:
+    image: my-spark-cluster:3.5.0
+    ports:
+      - "9090:8080"
+      - "7077:7077"
+      - "4040:4040"
+    volumes:
+      - ./apps:/opt/spark-apps
+      - ./data:/opt/spark-data
+      - ./spark/metrics.properties:/opt/spark/conf/metrics.properties
+    environment:
+      - SPARK_LOCAL_IP=172.18.0.10
+      - SPARK_WORKLOAD=master
+    networks:
+      spark-kafka:
+        ipv4_address: 172.18.0.10
+
+  spark-worker-a:
+    image: my-spark-cluster:3.5.0
+    ports:
+      - "9091:8080"
+      - "7000:7000"
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_MASTER=spark://spark-master:7077
+      - SPARK_WORKER_CORES=1
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_DRIVER_MEMORY=1G
+      - SPARK_EXECUTOR_MEMORY=1G
+      - SPARK_WORKLOAD=worker
+      - SPARK_LOCAL_IP=172.18.0.2
+    volumes:
+      - ./apps:/opt/spark-apps
+      - ./data:/opt/spark-data
+      - ./spark/metrics.properties:/opt/spark/conf/metrics.properties
+    networks:
+      spark-kafka:
+        ipv4_address: 172.18.0.2
+
+  spark-worker-b:
+    image: my-spark-cluster:3.5.0
+    ports:
+      - "9093:8080"
+      - "7001:7000"
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_MASTER=spark://spark-master:7077
+      - SPARK_WORKER_CORES=1
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_DRIVER_MEMORY=1G
+      - SPARK_EXECUTOR_MEMORY=1G
+      - SPARK_WORKLOAD=worker
+      - SPARK_LOCAL_IP=172.18.0.3
+    volumes:
+      - ./apps:/opt/spark-apps
+      - ./data:/opt/spark-data
+      - ./spark/metrics.properties:/opt/spark/conf/metrics.properties
+    networks:
+      spark-kafka:
+        ipv4_address: 172.18.0.3
+
+  kafka:
+    image: bitnami/kafka:3.7.0
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_CFG_NODE_ID: 0
+      KAFKA_CFG_PROCESS_ROLES: controller,broker
+      KAFKA_CFG_LISTENERS: "PLAINTEXT://172.18.0.4:9092,CONTROLLER://0.0.0.0:9093"
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 0@172.18.0.4:9093
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+    networks:
+      spark-kafka:
+        ipv4_address: 172.18.0.4
+
+  init-kafka:
+    image: bitnami/kafka:3.7.0
+    container_name: init-kafka
+    depends_on:
+      kafka:
+        condition: service_started
+    entrypoint: [ '/usr/bin/bash', '-c' ]
+    command: |
+      "
+      set -ex
+
+      # blocks until kafka is reachable
+      /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server 172.18.0.4:9092 --list
+
+      echo -e 'Creating kafka topics'
+      /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server 172.18.0.4:9092 --create --if-not-exists --topic topic-events --replication-factor 1 --partitions 1
+
+      echo -e 'Successfully created the following topics:'
+      /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server 172.18.0.4:9092 --list
+      "
+    networks:
+      spark-kafka:
+        ipv4_address: 172.18.0.11
+
+  s3-storage:
+    container_name: s3-storage
+    image: localstack/localstack:3.4.0
+    environment:
+      - SERVICES=s3
+      - DEBUG=1
+      - DEFAULT_REGION=eu-west-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    ports:
+      - "4566:4566"
+    volumes:
+      - './tmp/volumes/s3-storage/:/var/lib/localstack'
+    networks:
+      spark-kafka:
+        ipv4_address: 172.18.0.6
+
+  init-s3-storage:
+    container_name: init-s3-storage
+    image: localstack/localstack:3.4.0
+    entrypoint: [ "bash", "-c", "awslocal --endpoint-url http://172.18.0.6:4566 s3 mb s3://my-bucket" ]
+    depends_on:
+      s3-storage:
+        condition: service_healthy
+    networks:
+      spark-kafka:
+        ipv4_address: 172.18.0.7
+
+  postgres:
+    image: postgres:14-alpine
+    container_name: postgres
+    environment:
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - POSTGRES_DB
+    healthcheck:
+      test: [ "CMD", "psql", "-U", "${POSTGRES_USER}", "${POSTGRES_DB}" ]
+    ports:
+      - '5432:5432'
+    networks:
+      spark-kafka:
+        ipv4_address: 172.18.0.8
+
+  hive-metastore:
+    image: apache/hive:4.0.0-alpha-2
+    container_name: hive-metastore
+    environment:
+      - SERVICE_NAME=metastore
+      - DB_DRIVER=postgres
+      - HIVE_CUSTOM_CONF_DIR=/hive_custom_conf
+    ports:
+      - "9083:9083"
+    volumes:
+      - ./data/delta/osdp/spark-warehouse:/opt/spark/work-dir/data/delta/osdp/spark-warehouse
+      - ./hive/conf/hive-site.xml:/opt/hive/conf/hive-site.xml
+      - ./hive/conf/jars/hadoop-aws-3.2.2.jar:/opt/hive/lib/hadoop-aws-3.2.2.jar
+      - ./hive/conf/jars/aws-java-sdk-bundle-1.11.375.jar:/opt/hive/lib/aws-java-sdk-bundle-1.11.375.jar
+      - ./hive/conf/.hiverc:/opt/hive/conf/.hiverc
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      spark-kafka:
+        ipv4_address: 172.18.0.9
+
+  spark-thrift-server:
+    image: my-spark-cluster:3.5.0
+    container_name: spark-thrift-server
+    depends_on:
+      spark-master:
+        condition: service_started
+      hive-metastore:
+        condition: service_started
+    environment:
+      - SPARK_WORKLOAD=thrift-server
+      - HIVE_METASTORE_URI=thrift://172.18.0.8:9083
+      - SPARK_MASTER=spark://172.18.0.10:7077
+      - SPARK_SQL_HIVE_METASTORE_URIS=thrift://172.18.0.8:9083
+    ports:
+      - "10000:10000"
+    entrypoint: >
+      /opt/spark/bin/spark-submit
+        --class org.apache.spark.sql.hive.thriftserver.HiveThriftServer2
+        --master spark://spark-master:7077
+        --deploy-mode client
+        --executor-memory 1G
+        --driver-memory 1G
+        --conf spark.sql.hive.metastore.version=2.3.9
+        --conf spark.sql.uris=thrift://172.18.0.9:9083
+        --conf spark.sql.hive.metastore.jars=maven
+        --conf spark.hadoop.hive.metastore.uris=thrift://172.18.0.9:9083
+        --conf spark.hadoop.fs.s3a.endpoint=http://172.18.0.6:4566
+        --conf spark.hadoop.fs.s3a.access.key=test
+        --conf spark.hadoop.fs.s3a.secret.key=test
+        --conf spark.hadoop.fs.s3a.path.style.access=true
+        --packages org.apache.hadoop:hadoop-aws:3.3.1,com.amazonaws:aws-java-sdk-bundle:1.11.375
+        local://opt/spark/jars/spark-hive-thriftserver_2.12-3.5.0.jar
+    networks:
+      spark-kafka:
+        ipv4_address: 172.18.0.11
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    networks:
+      spark-kafka:
+        ipv4_address: 172.18.0.13
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "19090:9090"
+    networks:
+      spark-kafka:
+        ipv4_address: 172.18.0.12
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+
+volumes:
+  warehouse:
