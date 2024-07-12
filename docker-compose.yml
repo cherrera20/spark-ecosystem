@@ -102,7 +102,7 @@ services:
 
       # blocks until kafka is reachable
       /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server 172.18.0.4:9092 --list
-
+  
       echo -e 'Creating kafka topics'
       /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server 172.18.0.4:9092 --create --if-not-exists --topic topic-events --replication-factor 1 --partitions 1
 
@@ -111,21 +111,23 @@ services:
       "
     networks:
       spark-kafka:
-        ipv4_address: 172.18.0.11
+        ipv4_address: 172.18.0.21
 
-  s3-storage:
-    container_name: s3-storage
+  localstack:
+    container_name: "${LOCALSTACK_DOCKER_NAME:-localstack-main}"
     image: localstack/localstack:3.4.0
+    ports:
+      - "127.0.0.1:4566:4566"
+      - "127.0.0.1:4510-4559:4510-4559"
     environment:
-      - SERVICES=s3
-      - DEBUG=1
+      - SERVICES=events,sqs,s3
+      - DEBUG=true
       - DEFAULT_REGION=eu-west-1
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
-    ports:
-      - "4566:4566"
     volumes:
-      - './tmp/volumes/s3-storage/:/var/lib/localstack'
+      - "${LOCALSTACK_VOLUME_DIR:-./volume}:/var/lib/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
     networks:
       spark-kafka:
         ipv4_address: 172.18.0.6
@@ -135,11 +137,24 @@ services:
     image: localstack/localstack:3.4.0
     entrypoint: [ "bash", "-c", "awslocal --endpoint-url http://172.18.0.6:4566 s3 mb s3://my-bucket" ]
     depends_on:
-      s3-storage:
+      localstack:
         condition: service_healthy
     networks:
       spark-kafka:
         ipv4_address: 172.18.0.7
+
+  rabbitmq:
+    image: 'rabbitmq:3.12-management'
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=codely
+      - RABBITMQ_DEFAULT_PASS=codely
+    networks:
+      spark-kafka:
+        ipv4_address: 172.18.0.20
 
   postgres:
     image: postgres:14-alpine

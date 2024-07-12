@@ -1,6 +1,5 @@
 /apps/*
 /data/
 /hive-metastore/
-/volumes/
-/tmp/
+/volume/
 /run.sh
