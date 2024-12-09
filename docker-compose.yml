@@ -258,8 +258,6 @@ services:
       - SPARK_MASTER=spark://spark-master:7077
       - SPARK_HOME=/usr/local/spark
       - PYSPARK_PYTHON=python3
-      - PYSPARK_DRIVER_PYTHON=jupyter
-      - PYSPARK_DRIVER_PYTHON_OPTS="notebook --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token='' --NotebookApp.password=''"
     volumes:
       - ./notebooks:/home/jovyan/work
       - ./apps:/opt/spark-apps
@@ -270,6 +268,7 @@ services:
     networks:
       spark-kafka:
         ipv4_address: 172.18.0.15
-
+    command: >
+      start.sh jupyter notebook --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token='' --NotebookApp.password=''
 volumes:
   warehouse:
