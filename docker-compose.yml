@@ -1,4 +1,4 @@
-name: "spark-kafka-cluster"
+name: "spark-ecosystem-cluster"
 
 networks:
   spark-kafka:
