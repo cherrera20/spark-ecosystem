@@ -1,0 +1,9 @@
+ENABLE_PROXY_FIX = True
+SECRET_KEY = "MyVerySecretKey"
+PREVENT_UNSAFE_DB_CONNECTIONS = False
+TALISMAN_ENABLED = False
+AWS_ACCESS_KEY_ID = "test"
+AWS_SECRET_ACCESS_KEY = "test"
+AWS_REGION_NAME = "eu-west-1"
+S3_ENDPOINT_URL = "http://172.18.0.6:4566"
+SQLALCHEMY_DATABASE_URI = 'postgresql+psycopg2://superset:secretsecret@superset-database:5432/superset'

@@ -3,3 +3,6 @@
 /hive-metastore/
 /volume/
 /run.sh
+/superset_home
+/airflow-data
+/postgres_data

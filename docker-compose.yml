@@ -9,26 +9,37 @@ networks:
       config:
         - subnet: "172.18.0.0/16"
 
+x-shared-volumes:
+  &spark-volumes
+  - ./apps:/opt/spark-apps
+  - ./data:/opt/spark-data
+  - ./spark/metrics.properties:/opt/spark/conf/metrics.properties
+  - ./spark/config/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+
 services:
   spark-master:
-    image: my-spark-cluster:3.5.0
+    build:
+      context: ./spark
+      dockerfile: Dockerfile
     ports:
       - "9090:8080"
       - "7077:7077"
       - "4040:4040"
-    volumes:
-      - ./apps:/opt/spark-apps
-      - ./data:/opt/spark-data
-      - ./spark/metrics.properties:/opt/spark/conf/metrics.properties
+    volumes: *spark-volumes
     environment:
       - SPARK_LOCAL_IP=172.18.0.10
       - SPARK_WORKLOAD=master
+      - PYSPARK_PYTHON=python3
+      - SPARK_JARS_PACKAGES=org.apache.hadoop:hadoop-aws:3.3.1,com.amazonaws:aws-java-sdk-bundle:1.11.901
+
     networks:
       spark-kafka:
         ipv4_address: 172.18.0.10
 
   spark-worker-a:
-    image: my-spark-cluster:3.5.0
+    build:
+      context: ./spark
+      dockerfile: Dockerfile
     ports:
       - "9091:8080"
       - "7000:7000"
@@ -36,22 +47,22 @@ services:
       - spark-master
     environment:
       - SPARK_MASTER=spark://spark-master:7077
-      - SPARK_WORKER_CORES=1
-      - SPARK_WORKER_MEMORY=1G
-      - SPARK_DRIVER_MEMORY=1G
-      - SPARK_EXECUTOR_MEMORY=1G
+      - SPARK_WORKER_CORES=2
+      - SPARK_WORKER_MEMORY=2G
+      - SPARK_EXECUTOR_MEMORY=2G
       - SPARK_WORKLOAD=worker
       - SPARK_LOCAL_IP=172.18.0.2
-    volumes:
-      - ./apps:/opt/spark-apps
-      - ./data:/opt/spark-data
-      - ./spark/metrics.properties:/opt/spark/conf/metrics.properties
+      - PYSPARK_PYTHON=python3
+      - SPARK_JARS_PACKAGES=org.apache.hadoop:hadoop-aws:3.3.1,com.amazonaws:aws-java-sdk-bundle:1.11.901
+    volumes: *spark-volumes
     networks:
       spark-kafka:
         ipv4_address: 172.18.0.2
 
   spark-worker-b:
-    image: my-spark-cluster:3.5.0
+    build:
+      context: ./spark
+      dockerfile: Dockerfile
     ports:
       - "9093:8080"
       - "7001:7000"
@@ -59,16 +70,14 @@ services:
       - spark-master
     environment:
       - SPARK_MASTER=spark://spark-master:7077
-      - SPARK_WORKER_CORES=1
-      - SPARK_WORKER_MEMORY=1G
-      - SPARK_DRIVER_MEMORY=1G
-      - SPARK_EXECUTOR_MEMORY=1G
+      - SPARK_WORKER_CORES=2
+      - SPARK_WORKER_MEMORY=2G
+      - SPARK_EXECUTOR_MEMORY=2G
       - SPARK_WORKLOAD=worker
       - SPARK_LOCAL_IP=172.18.0.3
-    volumes:
-      - ./apps:/opt/spark-apps
-      - ./data:/opt/spark-data
-      - ./spark/metrics.properties:/opt/spark/conf/metrics.properties
+      - PYSPARK_PYTHON=python3
+      - SPARK_JARS_PACKAGES=org.apache.hadoop:hadoop-aws:3.3.1,com.amazonaws:aws-java-sdk-bundle:1.11.901
+    volumes: *spark-volumes
     networks:
       spark-kafka:
         ipv4_address: 172.18.0.3
@@ -193,41 +202,45 @@ services:
       spark-kafka:
         ipv4_address: 172.18.0.9
 
-  spark-thrift-server:
-    image: my-spark-cluster:3.5.0
-    container_name: spark-thrift-server
-    depends_on:
-      spark-master:
-        condition: service_started
-      hive-metastore:
-        condition: service_started
-    environment:
-      - SPARK_WORKLOAD=thrift-server
-      - HIVE_METASTORE_URI=thrift://172.18.0.8:9083
-      - SPARK_MASTER=spark://172.18.0.10:7077
-      - SPARK_SQL_HIVE_METASTORE_URIS=thrift://172.18.0.8:9083
-    ports:
-      - "10000:10000"
-    entrypoint: >
-      /opt/spark/bin/spark-submit
-        --class org.apache.spark.sql.hive.thriftserver.HiveThriftServer2
-        --master spark://spark-master:7077
-        --deploy-mode client
-        --executor-memory 1G
-        --driver-memory 1G
-        --conf spark.sql.hive.metastore.version=2.3.9
-        --conf spark.sql.uris=thrift://172.18.0.9:9083
-        --conf spark.sql.hive.metastore.jars=maven
-        --conf spark.hadoop.hive.metastore.uris=thrift://172.18.0.9:9083
-        --conf spark.hadoop.fs.s3a.endpoint=http://172.18.0.6:4566
-        --conf spark.hadoop.fs.s3a.access.key=test
-        --conf spark.hadoop.fs.s3a.secret.key=test
-        --conf spark.hadoop.fs.s3a.path.style.access=true
-        --packages org.apache.hadoop:hadoop-aws:3.3.1,com.amazonaws:aws-java-sdk-bundle:1.11.375
-        local://opt/spark/jars/spark-hive-thriftserver_2.12-3.5.0.jar
-    networks:
-      spark-kafka:
-        ipv4_address: 172.18.0.11
+#  spark-thrift-server:
+#    image: my-spark-cluster:3.5.0
+#    container_name: spark-thrift-server
+#    depends_on:
+#      spark-master:
+#        condition: service_started
+#      hive-metastore:
+#        condition: service_started
+#    environment:
+#      - SPARK_WORKLOAD=thrift-server
+#      - HIVE_METASTORE_URI=thrift://172.18.0.8:9083
+#      - SPARK_MASTER=spark://172.18.0.10:7077
+#      - SPARK_SQL_HIVE_METASTORE_URIS=thrift://172.18.0.8:9083
+#    ports:
+#      - "10000:10000"
+#    entrypoint: >
+#      /opt/spark/bin/spark-submit
+#        --class org.apache.spark.sql.hive.thriftserver.HiveThriftServer2
+#        --master spark://spark-master:7077
+#        --deploy-mode client
+#        --executor-memory 512M
+#        --driver-memory 512M
+#        --conf spark.executor.cores=1
+#        --conf spark.executor.instances=1
+#        --conf spark.dynamicAllocation.enabled=false
+#        --conf spark.cores.max=2
+#        --conf spark.sql.hive.metastore.version=2.3.9
+#        --conf spark.sql.uris=thrift://172.18.0.9:9083
+#        --conf spark.sql.hive.metastore.jars=maven
+#        --conf spark.hadoop.hive.metastore.uris=thrift://172.18.0.9:9083
+#        --conf spark.hadoop.fs.s3a.endpoint=http://172.18.0.6:4566
+#        --conf spark.hadoop.fs.s3a.access.key=test
+#        --conf spark.hadoop.fs.s3a.secret.key=test
+#        --conf spark.hadoop.fs.s3a.path.style.access=true
+#        --packages org.apache.hadoop:hadoop-aws:3.3.1,com.amazonaws:aws-java-sdk-bundle:1.11.375
+#        local://opt/spark/jars/spark-hive-thriftserver_2.12-3.5.0.jar
+#    networks:
+#      spark-kafka:
+#        ipv4_address: 172.18.0.11
 
   grafana:
     image: grafana/grafana:latest
@@ -262,6 +275,7 @@ services:
       - ./notebooks:/home/jovyan/work
       - ./apps:/opt/spark-apps
       - ./data:/opt/spark-data
+      - ./spark/config/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
     depends_on:
       - spark-master
       - kafka
@@ -270,5 +284,130 @@ services:
         ipv4_address: 172.18.0.15
     command: >
       start.sh jupyter notebook --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token='' --NotebookApp.password=''
+
+  airflow-postgres:
+    image: postgres:12
+    container_name: airflow-postgres
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U airflow" ]
+      interval: 10s
+      retries: 5
+    networks:
+      spark-kafka:
+        ipv4_address: 172.18.0.30
+
+  airflow-init:
+    image: apache/airflow:2.6.2
+    container_name: airflow_init
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@172.18.0.30:5432/airflow
+      - AIRFLOW__CORE__FERNET_KEY=FB0o_zt4e3Ziq3LdUUO7F2Z95cvFFx16hU8jTeR1ASM=
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__CORE__LOGGING_LEVEL=INFO
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db init &&
+        airflow users create \
+          --role Admin \
+          --username airflow \
+          --password airflow \
+          --email airflow@airflow.com \
+          --firstname airflow \
+          --lastname airflow
+    networks:
+      spark-kafka:
+        ipv4_address: 172.18.0.31
+
+  airflow-webserver:
+    image: apache/airflow:2.6.2
+    container_name: airflow_webserver
+    restart: always
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    ports:
+      - "8080:8080"
+    volumes: # sudo chmod 777 -R ./airflow-data
+      - ./airflow-data:/opt/airflow/dags
+      - ./airflow-data/logs:/opt/airflow/logs
+      - ./airflow-data/logs:/opt/airflow/logs
+      - ./airflow-data/plugins:/opt/airflow/plugins
+      - ./airflow-data/config:/opt/airflow/config
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@172.18.0.30:5432/airflow
+      - AIRFLOW__CORE__FERNET_KEY=FB0o_zt4e3Ziq3LdUUO7F2Z95cvFFx16hU8jTeR1ASM=
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__CORE__LOGGING_LEVEL=INFO
+    command: airflow webserver
+    healthcheck:
+      test: [ "CMD", "curl", "--fail", "http://localhost:8080/health" ]
+      interval: 30s
+      timeout: 30s
+      retries: 5
+    networks:
+      spark-kafka:
+        ipv4_address: 172.18.0.32
+
+  airflow-scheduler:
+    image: apache/airflow:2.6.2
+    container_name: airflow_scheduler
+
+  superset:
+    init: true
+    build:
+      context: ./superset
+      dockerfile: Dockerfile
+    container_name: superset
+    volumes:
+      - ./superset_home:/app/superset_home
+    environment:
+      - DATABASE_DB=superset
+      - DATABASE_HOST=superset-database
+      - DATABASE_PASSWORD=secretsecret
+      - DATABASE_USER=superset
+      - DATABASE_PORT=5432
+    ports:
+      - '8081:8088'
+    depends_on:
+      superset-database:
+        condition: service_healthy
+    networks:
+      spark-kafka:
+        ipv4_address: 172.18.0.33
+
+  superset-database:
+    init: true
+    image: postgres:alpine
+    container_name: superset_db
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=superset
+      - POSTGRES_USER=superset
+      - POSTGRES_PASSWORD=secretsecret
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U superset" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - '5000:5432'
+    networks:
+      spark-kafka:
+        ipv4_address: 172.18.0.34
+
 volumes:
   warehouse:

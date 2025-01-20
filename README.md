@@ -1,88 +1,97 @@
-<p align="center">
-  <a href="https://codely.com">
-    <img src="https://user-images.githubusercontent.com/10558907/170513882-a09eee57-7765-4ca4-b2dd-3c2e061fdad0.png" width="300px" height="92px" alt="Codely logo"/>
-  </a>
-</p>
+### Spark Ecosystem 🚀🔥
 
-<h1 align="center">
-    🎇 Spark ecosystem docker example
-</h1>
+Welcome to **Spark Ecosystem**, a fully operational local setup to experiment with a Spark-based ecosystem. This project leverages `docker-compose` to create a cluster with Spark, Kafka, LocalStack, RabbitMQ, PostgreSQL, Hive, Airflow, and other supporting tools—all running locally! 🐳✨
 
-<p align="center">
-    <a href="https://github.com/CodelyTV"><img src="https://img.shields.io/badge/Codely-OS-green.svg?style=flat-square" alt="Codely Open Source projects"/></a>
-    <a href="https://pro.codely.com"><img src="https://img.shields.io/badge/Codely-Pro-black.svg?style=flat-square" alt="Codely Pro courses"/></a>
-</p>
+---
 
-<p align="center">
-    Custom Spark-Kafka Cluster
-</p>
+## Features ✨
 
-<p align="center">
-  This project sets up a custom Spark-Kafka cluster using Docker and Docker Compose. It includes Apache Spark, Apache Kafka, PostgreSQL, Hive Metastore, LocalStack for S3, Prometheus, and Grafana.
-</p>
+- **Apache Spark**: A Spark master and two workers to execute distributed computations.
+- **Kafka**: Message streaming with Kafka, including topic initialization.
+- **Hive Metastore**: Centralized metadata storage for Spark SQL.
+- **LocalStack**: Mock AWS services for development and testing (e.g., S3).
+- **RabbitMQ**: Message broker for your pub/sub or task queue needs.
+- **PostgreSQL**: RDBMS support for applications like Hive and Airflow.
+- **Airflow**: Workflow orchestration made easy.
+- **Superset**: Data visualization and dashboarding tool.
+- **Jupyter**: Interactive notebooks for data exploration with PySpark.
+- **Prometheus & Grafana**: Monitoring and visualization of your cluster.
 
+---
 
+## Getting Started 🛠️
 
-## Project Structure
+### Prerequisites 📝
 
-- **hive/conf/.hiverc**: Hive initialization script to add necessary JAR files.
-- **hive/conf/hive-site.xml**: Configuration file for Hive Metastore.
-- **hive/conf/jars/**: Directory containing necessary JAR files for Hive.
-- **prometheus/prometheus.yml**: Configuration file for Prometheus.
-- **spark/metrics.properties**: Configuration file for Spark metrics.
-- **spark/run.sh**: Script to start Spark Master, Worker, or Submit jobs.
-- **docker-compose.yml**: Docker Compose configuration file to set up the entire cluster.
-- **Dockerfile**: Dockerfile to build the Spark cluster image.
+Ensure you have the following installed:
 
-## Setup Instructions
+- Docker 🐋
+- Docker Compose 📦
 
-### Prerequisites
+### Setup & Run ▶️
 
-- Docker
-- Docker Compose
+1. Clone this repository:
+   ```bash
+   git clone https://github.com/your-username/spark-ecosystem.git
+   cd spark-ecosystem
+   ```
 
-### Building the Docker Image
+2. Build and start the services:
+   ```bash
+   docker-compose up --build
+   ```
 
-First, build the Docker image for the Spark cluster:
+3. Access the services using their respective ports:
 
-```bash
-docker build -t my-spark-cluster:3.5.0 .
+   | Service           | URL/Port               |
+      |-------------------|------------------------|
+   | Spark Master      | [http://localhost:9090](http://localhost:9090) |
+   | Spark Worker A    | [http://localhost:9091](http://localhost:9091) |
+   | Spark Worker B    | [http://localhost:9093](http://localhost:9093) |
+   | Kafka             | `localhost:9092`       |
+   | Hive Metastore    | `localhost:9083`       |
+   | Airflow           | [http://localhost:8080](http://localhost:8080) |
+   | Superset          | [http://localhost:8081](http://localhost:8081) |
+   | Grafana           | [http://localhost:3000](http://localhost:3000) |
+   | Prometheus        | [http://localhost:19090](http://localhost:19090) |
+   | Jupyter Notebook  | [http://localhost:8888](http://localhost:8888) |
+
+---
+
+## Directory Structure 🗂️
+
+```plaintext
+.
+├── docker-compose.yml        # Compose file defining the ecosystem
+├── spark/                    # Spark configurations and Dockerfiles
+├── data/                     # Data storage for Hive and Spark
+├── notebooks/                # Jupyter notebooks for PySpark experiments
+├── prometheus/               # Prometheus configuration
+├── superset/                 # Superset setup
+├── airflow-data/             # Airflow DAGs, logs, and config
+├── hive/                     # Hive-specific configurations
 ```
 
-### Running the Cluster
+---
 
-Start the cluster using Docker Compose:
+## Customization ⚙️
 
-```bash
-docker-compose up
-```
+- Update `spark-defaults.conf` to configure Spark settings.
+- Use `metrics.properties` for monitoring with Prometheus.
+- Modify Kafka topics in the `init-kafka` service if needed.
 
-This command will start all the services defined in the `docker-compose.yml` file.
+---
 
-### Accessing Services
+## Contributing 🤝
 
-- **Spark Master**: [http://localhost:9090](http://localhost:9090)
-- **Spark Worker A**: [http://localhost:9091](http://localhost:9091)
-- **Spark Worker B**: [http://localhost:9093](http://localhost:9093)
-- **Kafka**: Accessible on port 9092
-- **S3 (LocalStack)**: Accessible on port 4566
-- **PostgreSQL**: Accessible on port 5432
-- **Hive Metastore**: Accessible on port 9083
-- **Spark Thrift Server**: Accessible on port 10000
-- **Grafana**: [http://localhost:3000](http://localhost:3000)
-- **Prometheus**: [http://localhost:19090](http://localhost:19090)
+Contributions are welcome! Feel free to open an issue or submit a pull request.
 
-## Monitoring and Metrics
+---
 
-### Prometheus
+## License 📜
 
-Prometheus is configured to scrape metrics from the Spark Master, Workers, and Executors.
+This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
 
-### Grafana
+---
 
-Grafana is set up to visualize the metrics collected by Prometheus. Access it at [http://localhost:3000](http://localhost:3000).
-
-## Additional Notes
-
-- Ensure that the specified volumes and paths exist and are accessible by Docker.
-- Customize the provided configurations as needed for your specific use case.
+Happy Spark-ing! 🌟
